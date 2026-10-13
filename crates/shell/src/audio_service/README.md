@@ -5,8 +5,12 @@ English | [简体中文](README.zh-CN.md)
 Installed apps can record a short voice clip and play an audio file through
 OctoSense's native audio devices. These APIs support macOS, Android and Windows.
 They do not themselves transcribe speech, synthesize speech, capture system audio, download
-media, or continue after the app leaves the foreground. Hardware acceptance is
-**unverified on Windows**; synthetic tests never activate a microphone or speaker.
+media, or continue after the app leaves the foreground. On 2026-10-13, a
+task-owned Windows desktop host recorded real microphone input, saved a mono
+16 kHz WAV after manual Stop and after the 30-second automatic limit, and
+discarded an active recording when the app panel or host closed. Speaker
+playback hardware acceptance on Windows is **unverified**; synthetic tests do
+not activate a microphone or speaker.
 
 | Method | Arguments | Result |
 | --- | --- | --- |

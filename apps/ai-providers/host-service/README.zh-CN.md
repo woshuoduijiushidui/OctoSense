@@ -97,5 +97,7 @@ cargo test --locked -p octosense-llm-service --test complete
 请求。只配置 Kimi 时 `configured` 为 false。上传共用应用调用次数及速率预算，
 不会自动重试；失败只提供稳定错误类别，不暴露供应商响应正文。
 本阶段不增加语音模型设置或面向通用应用的 ASR API。
-`cargo test --locked -p octosense-llm-service --test media` 使用假传输验证；
-真实麦克风和供应商验收需另行记录。
+`cargo test --locked -p octosense-llm-service --test media` 使用假传输验证。
+2026-10-13 在任务专用 Windows Pantry 候选中，真实语音经手动停止与自动停止后，
+MiniMax 转写均返回到可编辑输入框。该现场检查使用用户在宿主配置的提供方，
+不证明其他应用、提供方或平台的支持。

@@ -283,5 +283,8 @@ bounded multipart upload using `asr-1.0`. Kimi-only configurations report
 budget and is never automatically retried; failures expose stable error
 categories without provider response bodies. No speech model settings or
 general-purpose app ASR API are added. Fake-transport coverage is in
-`cargo test --locked -p octosense-llm-service --test media`; real microphone
-and provider acceptance require separate evidence.
+`cargo test --locked -p octosense-llm-service --test media`. On 2026-10-13,
+the task-owned Windows Pantry candidate recorded real speech and returned a
+MiniMax transcript to its editable input after manual and automatic Stop.
+That live check used a person-configured host provider; it did not test other
+apps, providers or platforms.
