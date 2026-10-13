@@ -319,6 +319,7 @@ mod tests {
         assert!(!valid_account(""));
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_secrets_dir_keeps_keys_owner_only() {
         let dir = std::env::temp_dir().join(format!("llm-vault-{}", std::process::id()));
@@ -337,12 +338,14 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
     }
 
+    #[cfg(unix)]
     fn core_dir(name: &str) -> PathBuf {
         let dir = std::env::temp_dir().join(format!("llm-vault-{name}-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         dir
     }
 
+    #[cfg(unix)]
     fn write_profile(core: &Path, env: serde_json::Value) {
         let path = octosense_llm_config::profile::profile_path(core);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -352,6 +355,7 @@ mod tests {
         std::fs::write(path, serde_json::to_vec_pretty(&profile).unwrap()).unwrap();
     }
 
+    #[cfg(unix)]
     fn profile_json(core: &Path) -> serde_json::Value {
         serde_json::from_slice(&std::fs::read(octosense_llm_config::profile::profile_path(core)).unwrap()).unwrap()
     }
@@ -359,6 +363,7 @@ mod tests {
     /// HarmonyOS: a key an earlier build kept in the secrets folder, which
     /// the embedded kernel never reads, moves into the profile; the folder,
     /// with a removed provider's leftover key, is deleted.
+    #[cfg(unix)]
     #[test]
     fn keys_in_the_secrets_folder_move_into_the_profile() {
         let core = core_dir("move");
@@ -383,6 +388,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&core);
     }
 
+    #[cfg(unix)]
     #[test]
     fn a_profile_that_cannot_be_read_keeps_the_secrets_folder() {
         let core = core_dir("keep");

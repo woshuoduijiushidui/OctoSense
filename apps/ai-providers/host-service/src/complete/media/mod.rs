@@ -13,6 +13,7 @@ use std::time::Duration;
 use url::Url;
 
 mod wire;
+mod transcribe;
 
 pub const RESPONSE_MAX: usize = 4 * 1024 * 1024;
 pub const ASSET_MAX: usize = 2 * 1024 * 1024;
@@ -64,6 +65,16 @@ pub trait Transport: Send + Sync {
         headers: &[(String, String)],
         body: Option<&str>,
     ) -> Result<(u16, Vec<u8>), String>;
+
+    fn request_bytes(
+        &self,
+        _method: &str,
+        _url: &str,
+        _headers: &[(String, String)],
+        _body: &[u8],
+    ) -> Result<(u16, Vec<u8>), String> {
+        Err("Binary media requests are unsupported by this transport.".into())
+    }
 }
 pub struct Http;
 impl Transport for Http {
@@ -93,6 +104,36 @@ impl Transport for Http {
         response
             .into_reader()
             .take(RESPONSE_MAX as u64 + 1)
+            .read_to_end(&mut bytes)
+            .map_err(|_| "The media provider response was interrupted.".to_string())?;
+        if bytes.len() > RESPONSE_MAX {
+            return Err("The media provider response exceeded the host byte limit.".into());
+        }
+        Ok((status, bytes))
+    }
+
+    fn request_bytes(
+        &self,
+        method: &str,
+        url: &str,
+        headers: &[(String, String)],
+        body: &[u8],
+    ) -> Result<(u16, Vec<u8>), String> {
+        let agent = ureq::AgentBuilder::new()
+            .timeout(Duration::from_secs(120))
+            .redirects(0)
+            .build();
+        let mut request = agent.request(method, url);
+        for (name, value) in headers {
+            request = request.set(name, value);
+        }
+        let response = match request.send_bytes(body) {
+            Ok(response) | Err(ureq::Error::Status(_, response)) => response,
+            Err(_) => return Err("The media provider could not be reached; the request may already have been accepted.".into()),
+        };
+        let status = response.status();
+        let mut bytes = Vec::new();
+        response.into_reader().take(RESPONSE_MAX as u64 + 1)
             .read_to_end(&mut bytes)
             .map_err(|_| "The media provider response was interrupted.".to_string())?;
         if bytes.len() > RESPONSE_MAX {
@@ -437,6 +478,8 @@ fn run_call(context: &Context) -> Result<Value, Refusal> {
     context.check()?;
     context.host.attach(&context.call.host_dir);
     match context.call.method() {
+        "transcribe_capability" => transcribe::capability(context),
+        "transcribe" => transcribe::run(context),
         "complete" => {
             let request = super::Request::from_args(&context.call.args)?;
             context
@@ -500,6 +543,17 @@ fn run(context: &Context, request: wire::Request) -> Result<Value, Refusal> {
 fn reserve(context: &Context, kind: &str, units: u64, now: u64) -> Result<(), Refusal> {
     // Both shared call/rate policy and modality resources must admit before any
     // billable request. Failed reservations are conservative, never refunded.
+    admit_call(context, now)?;
+    context.host.media.reserve(
+        &context.call.host_dir,
+        &context.call.app_id,
+        now,
+        kind,
+        units,
+    )
+}
+
+fn admit_call(context: &Context, now: u64) -> Result<(), Refusal> {
     {
         let mut ledger = context.host.ledger.lock().unwrap();
         ledger.attach(context.call.host_dir.join("model/ledger.json"));
@@ -514,13 +568,7 @@ fn reserve(context: &Context, kind: &str, units: u64, now: u64) -> Result<(), Re
             )
         })?;
     }
-    context.host.media.reserve(
-        &context.call.host_dir,
-        &context.call.app_id,
-        now,
-        kind,
-        units,
-    )
+    Ok(())
 }
 
 fn video_start(
@@ -755,12 +803,31 @@ fn public_url(raw: &str) -> Result<String, Refusal> {
 }
 
 pub(super) fn catalog() -> Vec<HostApiMethod> {
-    wire::schemas()
+    let mut methods: Vec<_> = wire::schemas()
         .into_iter()
         .map(|(name, summary, args, result)| {
             HostApiMethod::new(name, 1, "model", summary, args, result)
                 .with_platforms(&["macos", "android", "windows", "linux", "ios", "openharmony"])
                 .with_agent_access(AgentAccess::Allowed)
         })
-        .collect()
+        .collect();
+    methods.push(HostApiMethod::new("model.transcribe_capability", 1, "model",
+        "Check whether this host can transcribe Pantry's app-local audio",
+        json!({"type":"object","additionalProperties":false}),
+        json!({"type":"object","required":["schema","supported","configured"],
+            "properties":{"schema":{"const":1},"supported":{"const":true},
+                "configured":{"type":"boolean"}},"additionalProperties":false}))
+        .with_platforms(&["windows"])
+        .with_agent_access(AgentAccess::Allowed));
+    methods.push(HostApiMethod::new("model.transcribe", 1, "model",
+        "Transcribe a bounded Pantry WAV from the calling app's storage",
+        json!({"type":"object","required":["audio"],"additionalProperties":false,
+            "properties":{"audio":{"type":"object","required":["app_path"],
+                "additionalProperties":false,"properties":{"app_path":{"type":"string","minLength":1}}}}}),
+        json!({"type":"object","required":["text","duration_seconds"],
+            "additionalProperties":false,"properties":{"text":{"type":"string","minLength":1},
+                "duration_seconds":{"type":"number","exclusiveMinimum":0}}}))
+        .with_platforms(&["windows"])
+        .with_agent_access(AgentAccess::ForegroundOnly));
+    methods
 }
