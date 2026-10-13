@@ -266,7 +266,7 @@ fn descriptors_do_not_claim_unimplemented_location_or_background_authorization()
             .find(|m| m.name.ends_with("permission.request"))
             .unwrap();
         assert_eq!(request.agent_access, services::AgentAccess::ForegroundOnly);
-        assert_eq!(request.platforms.contains(&"windows".into()), family == "microphone");
+        assert_eq!(request.platforms.contains(&"windows".into()), matches!(family, "camera" | "microphone"));
         assert!(request.input_schema["additionalProperties"] == false);
         assert_eq!(
             methods.iter().any(|m| m.name == "location.get"),

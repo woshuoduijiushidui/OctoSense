@@ -4,7 +4,7 @@
     "base_revision": "d653bc4493619ab979ccff165cf48c0c63b77d19",
     "patch": "tools/runtime-patches/makepad-settings.patch",
     "sha256": "3a79cddddc89dc4d064a9f0bdd17dc8111dcab9c796a334d95f61ecb9d5011aa",
-    "tree": "6a9d14109fa8c8d1e85a78e807ed2432be9a5f8c",
+    "tree": "55b8edfe127ddd32d975974e6ae93dc09175c528",
     "product_fixes": [
       "Settings integration: Android IME synchronization, accessibility and reduced motion, GLES program-cache validation, obscured-gesture cancellation and scroll-position observation.",
       "Contained-app isolation and secret-input restrictions come from the pinned upstream runtime; the Settings overlay preserves those gates.",
@@ -52,7 +52,8 @@
       "A hidden Android native composer remembers animated IME insets without requesting a root layout every frame; showing it applies the latest inset before its first visible frame.",
       "Launch-input hardening: the Studio connection and the OCTOS_PROXY app HTTP proxy, which Makepad itself acts on from an Android Intent extra, are honoured only when the build opts into launch-time development input (debuggable, or the manifest meta-data dev.makepad.LAUNCH_STUDIO). A shipped build ignores them and drops any Studio host a development build saved. The exported activity would otherwise let another installed app point it at a host or a proxy.",
       "A contained TextInput exposes take_key_focus to its own Splash script so an explicit transcription can return keyboard focus to the editable Agent draft.",
-      "Windows WM_ACTIVATE treats mouse click activation as focus gain, preserving foreground device access when a person enters the app by clicking its window."
+      "Windows WM_ACTIVATE treats mouse click activation as focus gain, preserving foreground device access when a person enters the app by clicking its window.",
+      "A Media Foundation camera source feeds the existing YUV video preview and still-capture path, with latest-frame buffering and cleanup; macOS retains its native AVFoundation preview."
     ],
     "stacked": [
       {
@@ -210,6 +211,10 @@
       {
         "patch": "tools/runtime-patches/makepad-windows-click-focus.patch",
         "sha256": "e4658270c78162ce71949fdb5fcd60d51e9e2eaca7216ca277fc5555cd55fd2e"
+      },
+      {
+        "patch": "tools/runtime-patches/makepad-windows-camera-preview.patch",
+        "sha256": "4fd133379eb6d8973d146656198df33ed20320a3711986a5cf271ab8e730de3e"
       }
     ]
   }

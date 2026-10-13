@@ -146,10 +146,11 @@ separate external-browser authentication path, with platform execution still
 requiring acceptance. The subsequent [desktop browser extension](../desktop-embedded-browser.md) adds
 ordinary `WebReader` on Windows and Linux X11/XWayland; native Wayland and missing
 engines fail visibly. This does not enable embedded backend authentication. Google Android login remains unsupported. The device
-adapter now advertises Windows only for microphone permission and recording in
-the Issue #3 host extension. The Windows consent adapter cannot verify the OS
-privacy setting; a successful consent request is not proof of audio frames.
-Camera and location remain unsupported there. Linux/iOS are not advertised.
+adapter now advertises Windows camera permission and preview in the merged
+image bridge, plus microphone permission and recording in the Issue #3 host
+extension. The Windows microphone consent adapter cannot verify the OS privacy
+setting; a successful consent request is not proof of audio frames. Location
+remains unsupported there. Linux/iOS are not advertised.
 No broad OS access,
 arbitrary Rust/native library execution, or Wasm loading is added.
 
