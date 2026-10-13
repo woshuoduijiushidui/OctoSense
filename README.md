@@ -491,3 +491,23 @@ Each product is tagged on its own: `desktop-v*`, `home-v*` (the APK) and `rom-v*
 ## License
 
 Apache License 2.0 ([LICENSE](LICENSE), [NOTICE](NOTICE)). Source copied from Makepad keeps its MIT notice ([LICENSES/](LICENSES)). Dependencies keep their own licenses.
+
+## Run Pantry Steward locally on Windows
+
+Keep the separate Pantry Steward checkout at `apps/pantry-steward`. From this
+platform checkout, double-click `run-pantry.cmd`, or use `run-pantry.cmd --check`
+to validate its bundle without opening a window. The launcher uses the app's
+existing pinned Hub build and signed local-install helpers. It builds the
+desktop with `app-hub,octos-core`, leaving unrelated optional native apps and
+craft engines out of the runtime. It does not fetch or overwrite either
+checkout, regenerate a stale bundle digest, or generate signing keys.
+
+Existing local test keys must already be prepared as described by the app.
+The default app profile is `apps/pantry-steward/.local-state`; `--app-data`
+selects another profile. Configure models in the host's AI providers panel;
+the companion Windows speech path requires a configured MiniMax provider.
+`--hidden`, `--remote`, `--offline` and `--build` are also supported.
+
+The modified desktop opened the current app's first-run profiling screen in
+a fresh hidden profile. Live model, camera and physical microphone checks
+were not part of this startup check.

@@ -479,3 +479,19 @@ python3 ../rom/scripts/build-home.py --help                     # the Home and B
 ## 许可证
 
 Apache License 2.0（[LICENSE](LICENSE)、[NOTICE](NOTICE)）。从 Makepad 复制的源码保留其 MIT 声明（[LICENSES/](LICENSES)）。依赖项保留各自的许可证。
+
+## Windows 本地运行冰箱管家
+
+将独立的 Pantry Steward 仓库放在 `apps/pantry-steward`。在平台根目录双击
+`run-pantry.cmd`，或运行 `run-pantry.cmd --check`，仅检查应用包。启动器复用
+应用现有的固定版本 Hub 构建与本地签名安装流程，并使用 `app-hub,octos-core`
+构建桌面；无关的可选原生应用和创作引擎不进入运行环境。它不会拉取或覆盖
+两个仓库的本地代码，不会自动修复过期包摘要，也不会生成签名密钥。
+
+启动前须按应用说明准备好已有的本地测试密钥。默认应用数据位于
+`apps/pantry-steward/.local-state`，可用 `--app-data` 指定其他目录。模型在宿主
+的 AI 提供方设置中配置；配套 Windows 语音功能需要配置 MiniMax 提供方。
+另外支持 `--hidden`、`--remote`、`--offline` 和 `--build`。
+
+已在全新隔离档案中确认魔改桌面可以打开当前应用的首次建档页面。该启动
+检查未调用真实模型，也未测试摄像头或物理麦克风。
