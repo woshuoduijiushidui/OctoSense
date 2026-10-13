@@ -131,7 +131,7 @@ fn parse(family: &str, method: &str, args: &Value) -> Result<Operation, String> 
     }
 }
 fn supported() -> bool {
-    cfg!(any(target_os = "macos", target_os = "android"))
+    cfg!(any(target_os = "macos", target_os = "android", target_os = "windows"))
 }
 fn descriptor(name: &str, family: &str, description: &str, input: Value) -> HostApiMethod {
     HostApiMethod::new(
@@ -147,7 +147,7 @@ fn descriptor(name: &str, family: &str, description: &str, input: Value) -> Host
             "error":{"type":["string","null"]},"frames":{"type":"integer","minimum":0,"description":"Device frames received or rendered; not delivery or audibility confirmation"},
             "format":{"enum":["wav",null]}}}),
     )
-    .with_platforms(&["macos", "android"])
+    .with_platforms(&["macos", "android", "windows"])
     .with_agent_access(AgentAccess::ForegroundOnly)
 }
 fn session_schema() -> Value {
@@ -208,7 +208,7 @@ pub(crate) fn call(call: ServiceCall, reply: Replier) {
     let result = (|| {
         if !supported() {
             return Err(
-                "unsupported_platform: Native audio sessions currently support macOS and Android"
+                "unsupported_platform: Native audio sessions currently support macOS, Android and Windows"
                     .into(),
             );
         }
@@ -376,7 +376,7 @@ impl Default for State {
             background: false,
             // A desktop launch may start behind another application's window.
             // Only the native focus event can authorize this window initially.
-            window_unfocused: cfg!(target_os = "macos"),
+            window_unfocused: cfg!(any(target_os = "macos", target_os = "windows")),
             input: None,
             output: None,
             timer: Timer::default(),
