@@ -84,19 +84,20 @@ cargo test --locked -p octosense-llm-service --test complete
 
 真实供应商示例 `model_complete_live` 会产生真实请求和费用，只有明确进行该项验收时才运行。macOS 钥匙串测试也默认忽略，需显式选择 `-- --ignored keychain`。仓库只使用根目录统一固定的依赖及 `.sources/`，不增加个人机器路径或本地 patch。
 
-## Windows Pantry 语音转写
+## Windows 应用本地语音转写
 
-本地 Windows 宿主仅向已准入的 `pantry-steward` 应用开放
+本地 Windows 宿主向获准使用模型的已安装应用开放
 `model.transcribe_capability({})` 和
 `model.transcribe({"audio":{"app_path":"/agent/voice.wav"}})`。能力探测仅返回
 `schema`、`supported`、`configured`，转写仅返回 `text`、`duration_seconds`。
-实际转写还要求应用处于前台。其他应用和平台不能使用这条桥；回复前会重新检查应用准入及供应商配置。
+实际转写还要求应用处于前台。其他平台不列出这条桥；回复前会重新检查调用应用的准入及供应商配置。
 
-宿主只读取 Pantry 自身存储中非空、单声道 16 kHz PCM16、最多 1 MiB 的 WAV。
+宿主只读取调用应用自身存储中非空、单声道 16 kHz PCM16、最多 1 MiB 的 WAV。
 它按配置顺序选首个可用 MiniMax，用宿主密钥发送一次固定 `asr-1.0` multipart
 请求。只配置 Kimi 时 `configured` 为 false。上传共用应用调用次数及速率预算，
+并单独计入每天 300 秒的转写限额，
 不会自动重试；失败只提供稳定错误类别，不暴露供应商响应正文。
-本阶段不增加语音模型设置或面向通用应用的 ASR API。
+本阶段不增加语音模型设置。
 `cargo test --locked -p octosense-llm-service --test media` 使用假传输验证。
 2026-10-13 在任务专用 Windows Pantry 候选中，真实语音经手动停止与自动停止后，
 MiniMax 转写均返回到可编辑输入框。该现场检查使用用户在宿主配置的提供方，

@@ -30,6 +30,7 @@ const JOBS: usize = 64;
 pub struct Limits {
     pub image_pixels_per_day: u64,
     pub audio_characters_per_day: u64,
+    pub transcription_seconds_per_day: u64,
     pub video_seconds_per_day: u64,
     pub embedding_bytes_per_day: u64,
 }
@@ -38,6 +39,7 @@ impl Default for Limits {
         Self {
             image_pixels_per_day: 8 * 1024 * 1024,
             audio_characters_per_day: 10_000,
+            transcription_seconds_per_day: 300,
             video_seconds_per_day: 12,
             embedding_bytes_per_day: 100_000,
         }
@@ -48,6 +50,7 @@ impl Limits {
         match kind {
             "image" => self.image_pixels_per_day,
             "audio" => self.audio_characters_per_day,
+            "transcription" => self.transcription_seconds_per_day,
             "video" => self.video_seconds_per_day,
             "embeddings" => self.embedding_bytes_per_day,
             _ => 0,
@@ -207,7 +210,7 @@ impl State {
         if value["apps"].as_object().unwrap().values().any(|app| {
             app.as_object().is_none_or(|counts| {
                 counts.iter().any(|(kind, count)| {
-                    !matches!(kind.as_str(), "image" | "audio" | "video" | "embeddings")
+                    !matches!(kind.as_str(), "image" | "audio" | "transcription" | "video" | "embeddings")
                         || !count.is_u64()
                 })
             })
@@ -224,7 +227,7 @@ impl State {
         match Self::load_budget(root, now) {
             Ok(value) => {
                 let mut result = json!({"resets_at":(now/DAY_MS+1)*DAY_MS/1000});
-                for kind in ["image", "audio", "video", "embeddings"] {
+                for kind in ["image", "audio", "transcription", "video", "embeddings"] {
                     result[kind] = json!({"used":value["apps"][app][kind].as_u64().unwrap_or(0),"limit":self.limits.for_kind(kind)});
                 }
                 result
@@ -812,15 +815,15 @@ pub(super) fn catalog() -> Vec<HostApiMethod> {
         })
         .collect();
     methods.push(HostApiMethod::new("model.transcribe_capability", 1, "model",
-        "Check whether this host can transcribe Pantry's app-local audio",
+        "Check whether this Windows host can transcribe the calling app's WAV",
         json!({"type":"object","additionalProperties":false}),
         json!({"type":"object","required":["schema","supported","configured"],
-            "properties":{"schema":{"const":1},"supported":{"const":true},
+            "properties":{"schema":{"const":1},"supported":{"type":"boolean"},
                 "configured":{"type":"boolean"}},"additionalProperties":false}))
         .with_platforms(&["windows"])
         .with_agent_access(AgentAccess::Allowed));
     methods.push(HostApiMethod::new("model.transcribe", 1, "model",
-        "Transcribe a bounded Pantry WAV from the calling app's storage",
+        "Transcribe a bounded WAV from the calling app's storage",
         json!({"type":"object","required":["audio"],"additionalProperties":false,
             "properties":{"audio":{"type":"object","required":["app_path"],
                 "additionalProperties":false,"properties":{"app_path":{"type":"string","minLength":1}}}}}),

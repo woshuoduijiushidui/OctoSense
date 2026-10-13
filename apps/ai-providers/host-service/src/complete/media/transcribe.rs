@@ -1,10 +1,9 @@
-//! Pantry's Windows-only, app-local WAV to MiniMax speech-to-text bridge.
+//! Windows app-local WAV to MiniMax speech-to-text bridge.
 use super::{wire, Candidate, Class, Code, Context, Refusal, RESPONSE_MAX};
 use serde_json::{json, Value};
 use std::io::Read;
 use std::path::Path;
 
-const APP: &str = "pantry-steward";
 const MAX_WAV: usize = 1024 * 1024;
 const MAX_TEXT: usize = 4096;
 
@@ -29,12 +28,12 @@ fn provider_error() -> Refusal {
     )
 }
 
-pub(super) fn supported(app: &str) -> bool {
-    supported_on(std::env::consts::OS, app)
+pub(super) fn supported() -> bool {
+    supported_on(std::env::consts::OS)
 }
 
-fn supported_on(platform: &str, app: &str) -> bool {
-    platform == "windows" && app == APP
+fn supported_on(platform: &str) -> bool {
+    platform == "windows"
 }
 
 fn route(candidates: &[Candidate]) -> Result<wire::Route, Refusal> {
@@ -43,7 +42,7 @@ fn route(candidates: &[Candidate]) -> Result<wire::Route, Refusal> {
         .filter(|candidate| {
             matches!(
                 candidate.provider.family.to_ascii_lowercase().as_str(),
-                "minimax" | "minimax-cn"
+                "minimax" | "minimax-cn" | "minimaxi"
             )
         })
         .cloned()
@@ -57,17 +56,20 @@ fn route(candidates: &[Candidate]) -> Result<wire::Route, Refusal> {
 }
 
 pub(super) fn capability(context: &Context) -> Result<Value, Refusal> {
-    if !supported(&context.call.app_id)
-        || context.call.args.as_object().is_none_or(|o| !o.is_empty())
-    {
-        return Err(unavailable());
+    if context.call.args.as_object().is_none_or(|o| !o.is_empty()) {
+        return Err(Refusal::new(Code::BadRequest, "The capability request takes no arguments."));
     }
     context.check()?;
     let configured = route(&context.providers()?).is_ok();
-    Ok(json!({"schema":1,"supported":true,"configured":configured}))
+    Ok(json!({"schema":1,"supported":supported(),"configured":configured && supported()}))
 }
 
-fn load_audio(host_dir: &Path, args: &Value) -> Result<Vec<u8>, Refusal> {
+fn load_audio(host_dir: &Path, app_id: &str, args: &Value) -> Result<Vec<u8>, Refusal> {
+    if app_id.is_empty() || app_id == "." || app_id == ".."
+        || app_id.contains(['/', '\\', ':', '\0'])
+    {
+        return Err(invalid_audio());
+    }
     let fields = args.as_object().ok_or_else(invalid_audio)?;
     if fields.len() != 1 {
         return Err(invalid_audio());
@@ -96,7 +98,7 @@ fn load_audio(host_dir: &Path, args: &Value) -> Result<Vec<u8>, Refusal> {
     let root = host_dir
         .parent()
         .ok_or_else(invalid_audio)?
-        .join(APP)
+        .join(app_id)
         .canonicalize()
         .map_err(|_| invalid_audio())?;
     let file = root
@@ -154,16 +156,17 @@ fn form(wav: &[u8]) -> (String, Vec<u8>) {
 }
 
 pub(super) fn run(context: &Context) -> Result<Value, Refusal> {
-    if !supported(&context.call.app_id) {
+    if !supported() {
         return Err(unavailable());
     }
     if !context.call.may_prompt || context.call.from_sheet {
         return Err(unavailable());
     }
     context.check()?;
-    let wav = load_audio(&context.call.host_dir, &context.call.args)?;
+    let wav = load_audio(&context.call.host_dir, &context.call.app_id, &context.call.args)?;
     let route = route(&context.providers()?)?;
-    super::admit_call(context, (context.host.clock)())?;
+    let seconds = ((wav.len() - 44) as u64 + 31_999) / 32_000;
+    super::reserve(context, "transcription", seconds, (context.host.clock)())?;
     context.check()?;
     if !context
         .providers()?
@@ -234,11 +237,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn only_windows_pantry_is_supported() {
-        assert!(supported_on("windows", APP));
+    fn only_windows_is_supported() {
+        assert!(supported_on("windows"));
         for platform in ["macos", "android", "linux", "ios"] {
-            assert!(!supported_on(platform, APP));
+            assert!(!supported_on(platform));
         }
-        assert!(!supported_on("windows", "org.example.other"));
     }
 }

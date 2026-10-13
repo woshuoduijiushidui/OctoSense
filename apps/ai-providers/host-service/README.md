@@ -265,24 +265,24 @@ Tests use a fake transport: `cargo test --locked -p octosense-llm-service --test
 A live check against DeepSeek (costs a fraction of a cent):
 `DEEPSEEK_API_KEY=… cargo run --locked -p octosense-llm-service --example model_complete_live`.
 
-## Pantry speech transcription on Windows
+## App-local speech transcription on Windows
 
 The local Windows host exposes `model.transcribe_capability({})` and
-`model.transcribe({"audio":{"app_path":"/agent/voice.wav"}})` to the admitted
-`pantry-steward` app. The transcription call additionally requires foreground.
+`model.transcribe({"audio":{"app_path":"/agent/voice.wav"}})` to admitted
+installed apps with the model grant. The transcription call additionally requires foreground.
 Capability returns only `schema`, `supported`
 and `configured`; transcription returns only `text` and `duration_seconds`.
-Other apps and platforms cannot use this bridge. The host rechecks the app's
+Other platforms do not advertise this bridge. The host rechecks the caller's
 grant and current provider before returning a result.
 
 Transcription reads a nonempty, mono 16 kHz PCM16 WAV of at most 1 MiB from
-Pantry's own app storage. The host chooses the first usable MiniMax provider
+the calling app's own storage. The host chooses the first usable MiniMax provider
 in the person's configured order, keeps its key in the host, and sends one
 bounded multipart upload using `asr-1.0`. Kimi-only configurations report
 `configured: false`. The upload is charged to the existing per-app call/rate
-budget and is never automatically retried; failures expose stable error
-categories without provider response bodies. No speech model settings or
-general-purpose app ASR API are added. Fake-transport coverage is in
+budget and a separate 300-second daily transcription quota. It is never
+automatically retried; failures expose stable error categories without provider
+response bodies. No speech model settings are added. Fake-transport coverage is in
 `cargo test --locked -p octosense-llm-service --test media`. On 2026-10-13,
 the task-owned Windows Pantry candidate recorded real speech and returned a
 MiniMax transcript to its editable input after manual and automatic Stop.

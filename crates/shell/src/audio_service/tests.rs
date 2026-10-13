@@ -287,10 +287,14 @@ fn bounded_capture_queue_reports_overflow_without_growing() {
 fn discovery_never_advertises_background_capture_or_unsupported_platforms() {
     let mut methods = microphone_methods();
     methods.extend(AudioService.api_methods());
-    assert_eq!(methods.len(), if supported() { 7 } else { 0 });
+    assert_eq!(methods.len(), if playback_supported() { 7 } else if supported() { 4 } else { 0 });
     for method in methods {
         method.validate().unwrap();
         assert_eq!(method.agent_access, AgentAccess::ForegroundOnly);
-        assert_eq!(method.platforms, vec!["macos", "android", "windows"]);
+        assert_eq!(method.platforms, if method.name.starts_with("microphone.") {
+            vec!["macos", "android", "windows"]
+        } else {
+            vec!["macos", "android"]
+        });
     }
 }

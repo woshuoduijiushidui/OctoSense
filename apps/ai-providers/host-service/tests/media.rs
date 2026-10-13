@@ -267,8 +267,8 @@ fn png() -> String {
 }
 
 #[cfg(target_os = "windows")]
-fn pantry_wav(rig: &Rig, name: &str, bytes: &[u8]) {
-    let dir = rig.root.join("pantry-steward/agent");
+fn app_wav(rig: &Rig, app: &str, name: &str, bytes: &[u8]) {
+    let dir = rig.root.join(app).join("agent");
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(dir.join(name), bytes).unwrap();
 }
@@ -300,10 +300,10 @@ fn pantry_transcribe_is_admitted_and_capability_hides_provider_details() {
     assert_eq!(octosense_appstore::host_api::available_versions().get("model.transcribe_capability"), Some(&1));
     assert_eq!(rig.answer(rig.submit("pantry-steward", "transcribe_capability", json!({}))).unwrap(),
         json!({"schema":1,"supported":true,"configured":false}));
-    assert!(rig.answer(rig.submit(APP, "transcribe_capability", json!({})))
-        .unwrap_err().starts_with("capability:"));
+    assert_eq!(rig.answer(rig.submit(APP, "transcribe_capability", json!({}))).unwrap(),
+        json!({"schema":1,"supported":true,"configured":false}));
     assert!(rig.answer(rig.submit("pantry-steward", "transcribe_capability", json!({"provider":"minimax"})))
-        .unwrap_err().starts_with("capability:"));
+        .unwrap_err().starts_with("bad_request:"));
     *rig.config.0.lock().unwrap() = vec![candidate("moonshot"), candidate("minimax-cn")];
     assert_eq!(rig.answer(rig.submit("pantry-steward", "transcribe_capability", json!({}))).unwrap(),
         json!({"schema":1,"supported":true,"configured":true}));
@@ -316,18 +316,20 @@ fn pantry_transcribe_uses_only_bounded_wav_and_fixed_minimax_multipart() {
     let rig = Rig::new("moonshot");
     *rig.config.0.lock().unwrap() = vec![candidate("moonshot"), candidate("minimax-cn"), candidate("minimax")];
     let wav = short_wav();
-    pantry_wav(&rig, "voice.wav", &wav);
+    app_wav(&rig, "pantry-steward", "voice.wav", &wav);
+    app_wav(&rig, APP, "voice.wav", &wav);
     rig.fake.json(200, json!({"text":"  今天吃豆腐  ","duration":0.25,"trace_id":"secret-trace"}));
     let request = json!({"audio":{"app_path":"/agent/voice.wav"}});
     let background_error = rig.answer(rig.submit("pantry-steward", "transcribe", request.clone())).unwrap_err();
     assert!(background_error.contains("unavailable to agents/background surfaces"),
         "background must be refused: {background_error}");
-    assert!(rig.call_front(APP, "transcribe", request.clone()).unwrap_err().starts_with("capability:"));
+    rig.fake.json(200, json!({"text":"今天吃豆腐","duration":0.25}));
+    assert_eq!(rig.call_front(APP, "transcribe", request.clone()).unwrap()["text"], "今天吃豆腐");
     let result = rig.call_front("pantry-steward", "transcribe", request).unwrap();
     assert_eq!(result, json!({"text":"今天吃豆腐","duration_seconds":0.25}));
     let seen = rig.fake.seen.lock().unwrap();
-    assert_eq!(seen.len(), 1);
-    let call = &seen[0];
+    assert_eq!(seen.len(), 2);
+    let call = &seen[1];
     assert_eq!(call.method, "POST");
     assert_eq!(call.url, "https://api.minimaxi.com/v1/speech_to_text");
     assert!(call.headers.iter().any(|(key,value)| key == "Authorization" && value == &format!("Bearer {KEY}")));
@@ -351,10 +353,10 @@ fn pantry_transcribe_uses_only_bounded_wav_and_fixed_minimax_multipart() {
 #[test]
 fn pantry_transcribe_rejects_paths_and_malformed_audio_before_upload() {
     let rig = Rig::new("minimax");
-    pantry_wav(&rig, "valid.wav", &short_wav());
-    pantry_wav(&rig, "empty.wav", b"");
-    pantry_wav(&rig, "broken.wav", b"RIFFbad");
-    pantry_wav(&rig, "oversize.wav", &vec![0; 1024 * 1024 + 1]);
+    app_wav(&rig, "pantry-steward", "valid.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "empty.wav", b"");
+    app_wav(&rig, "pantry-steward", "broken.wav", b"RIFFbad");
+    app_wav(&rig, "pantry-steward", "oversize.wav", &vec![0; 1024 * 1024 + 1]);
     for path in ["../valid.wav", "C:/valid.wav", "agent\\valid.wav", "https://host/valid.wav",
         "data:audio/wav;base64,AAAA", "//agent/valid.wav", "/agent/empty.wav",
         "/agent/broken.wav", "/agent/oversize.wav", "/agent/missing.wav"] {
@@ -373,14 +375,14 @@ fn pantry_transcribe_rejects_paths_and_malformed_audio_before_upload() {
 #[test]
 fn pantry_transcribe_charges_call_budget_and_never_retries_or_leaks_provider_errors() {
     let rig = Rig::call_limit("minimax", media::Limits::default(), 0);
-    pantry_wav(&rig, "voice.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
     assert!(rig.call_front("pantry-steward", "transcribe", json!({"audio":{"app_path":"/agent/voice.wav"}}))
         .unwrap_err().starts_with("budget:"));
     assert_eq!(rig.fake.count(), 0);
     drop(rig);
 
     let rig = Rig::new("minimax");
-    pantry_wav(&rig, "voice.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
     rig.fake.json(403, json!({"error":format!("{KEY} https://private.example/trace") }));
     let err = rig.call_front("pantry-steward", "transcribe", json!({"audio":{"app_path":"/agent/voice.wav"}})).unwrap_err();
     assert!(err.starts_with("provider:"));
@@ -390,13 +392,34 @@ fn pantry_transcribe_charges_call_budget_and_never_retries_or_leaks_provider_err
 
 #[cfg(target_os = "windows")]
 #[test]
+fn transcription_seconds_are_reserved_before_upload() {
+    let mut limits = media::Limits::default();
+    limits.transcription_seconds_per_day = 0;
+    let rig = Rig::limits("minimax", limits);
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
+    let err = rig.call_front("pantry-steward", "transcribe",
+        json!({"audio":{"app_path":"/agent/voice.wav"}})).unwrap_err();
+    assert!(err.starts_with("budget:"), "{err}");
+    assert_eq!(rig.fake.count(), 0);
+}
+
+#[cfg(target_os = "windows")]
+#[test]
+fn minimaxi_alias_is_a_configured_transcription_route() {
+    let rig = Rig::new("minimaxi");
+    assert_eq!(rig.call("transcribe_capability", json!({})).unwrap()["configured"], true);
+}
+
+#[cfg(target_os = "windows")]
+#[test]
 fn pantry_transcribe_rejects_empty_or_invalid_provider_text_without_leaking_response() {
     let rig = Rig::new("minimax");
-    pantry_wav(&rig, "voice.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
     let args = json!({"audio":{"app_path":"/agent/voice.wav"}});
     for reply in [
         json!({"text":"  ","duration":0.25,"trace_id":KEY}),
         json!({"text":"hello","duration":0,"trace_id":KEY}),
+        json!({"text":"hello","trace_id":KEY}),
         json!({"text":"x".repeat(4097),"duration":0.25,"trace_id":KEY}),
     ] {
         rig.fake.json(200, reply);
@@ -404,14 +427,14 @@ fn pantry_transcribe_rejects_empty_or_invalid_provider_text_without_leaking_resp
         assert!(error.starts_with("provider:"), "{error}");
         assert!(!error.contains(KEY));
     }
-    assert_eq!(rig.fake.count(), 3);
+    assert_eq!(rig.fake.count(), 4);
 }
 
 #[cfg(target_os = "windows")]
 #[test]
 fn pantry_transcribe_drops_a_late_result_after_provider_change() {
     let rig = Rig::new("minimax");
-    pantry_wav(&rig, "voice.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
     let gate = Arc::new(Gate::default());
     *rig.fake.gate.lock().unwrap() = Some(gate.clone());
     rig.fake.json(200, json!({"text":"迟到回复","duration":0.25}));
@@ -428,7 +451,7 @@ fn pantry_transcribe_drops_a_late_result_after_provider_change() {
 #[test]
 fn pantry_transcribe_requires_a_current_app_grant_at_start_and_delivery() {
     let rig = Rig::new("minimax");
-    pantry_wav(&rig, "voice.wav", &short_wav());
+    app_wav(&rig, "pantry-steward", "voice.wav", &short_wav());
     let args = json!({"audio":{"app_path":"/agent/voice.wav"}});
     rig.allowed.store(false, Ordering::SeqCst);
     assert!(rig.answer(rig.submit("pantry-steward", "transcribe_capability", json!({})))
