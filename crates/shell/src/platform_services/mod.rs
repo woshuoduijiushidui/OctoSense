@@ -118,7 +118,7 @@ fn permission(family: &str) -> Option<Permission> {
 }
 fn permission_supported(family: &str) -> bool {
     cfg!(any(target_os = "android", target_os = "macos"))
-        || (cfg!(target_os = "windows") && family == "camera")
+        || (cfg!(target_os = "windows") && matches!(family, "camera" | "microphone"))
 }
 fn prompt_supported(family: &str) -> bool {
     permission_supported(family)
@@ -198,7 +198,7 @@ impl HostService for DeviceService {
                 input.clone(),
                 output.clone(),
             )
-            .with_platforms(if self.family == "camera" { &["android", "macos", "windows"] } else { &["android", "macos"] })
+            .with_platforms(if matches!(self.family, "camera" | "microphone") { &["android", "macos", "windows"] } else { &["android", "macos"] })
             .with_agent_access(AgentAccess::Allowed),
             HostApiMethod::new(
                 format!("{}.permission.request", self.family),
@@ -208,7 +208,7 @@ impl HostService for DeviceService {
                 input.clone(),
                 output.clone(),
             )
-            .with_platforms(if self.family == "camera" { &["android", "macos", "windows"] } else { &["android", "macos"] })
+            .with_platforms(if matches!(self.family, "camera" | "microphone") { &["android", "macos", "windows"] } else { &["android", "macos"] })
             .with_agent_access(AgentAccess::ForegroundOnly),
             HostApiMethod::new(
                 format!("{}.permission.revoke", self.family),
@@ -219,7 +219,7 @@ impl HostService for DeviceService {
                 json!({"type":"object","required":["app_consent","os_permission_unchanged","scope"],"properties":{
                     "app_consent":{"const":false},"os_permission_unchanged":{"const":true},"scope":{"const":"host_api_v1_device_access"}}}),
             )
-            .with_platforms(if self.family == "camera" { &["android", "macos", "windows"] } else { &["android", "macos"] })
+            .with_platforms(if matches!(self.family, "camera" | "microphone") { &["android", "macos", "windows"] } else { &["android", "macos"] })
             .with_agent_access(AgentAccess::Allowed),
         ];
         methods.extend(capture_intent);
